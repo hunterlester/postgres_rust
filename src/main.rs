@@ -6,12 +6,15 @@ extern crate rustc_serialize;
 
 use postgres::{Connection, TlsMode};
 use postgres::rows::Row;
-use nickel::{Nickel, HttpRouter, Response, Responder, MiddlewareResult, StaticFilesHandler};
+use std::io;
+use nickel::{Nickel, HttpRouter, Request, Response, Responder, MiddlewareResult, StaticFilesHandler, JsonBody};
 use chrono::{NaiveDate};
 use std::collections::{BTreeMap, HashMap};
 use rustc_serialize::json::{self, Json, ToJson};
+use rustc_serialize::{Decodable, Decoder};
+use nickel::status::StatusCode;
 
-#[derive(Debug)]
+#[derive(Debug, RustcDecodable)]
 struct Herd {
   id: i32,
   breed: String,
@@ -46,6 +49,12 @@ fn retrieve_row(row: Row) -> Herd {
   }
 }
 
+fn parse_todo(request: &mut Request) -> Result<Herd, (StatusCode, io::Error)> {
+
+    request.json_as().map_err(|e| (StatusCode::BadRequest, e))
+
+}
+
 fn main() {
     let conn = Connection::connect("postgres://postgres:postgres@learn-postgres.c3ccnecqsxt1.us-west-2.rds.amazonaws.com:5432/postgres", TlsMode::None).unwrap();
 
@@ -70,6 +79,21 @@ fn main() {
 
       get "/herd" => |req, res| {
         data.to_json()
+      }
+
+      post "/herd" => |req, res| {
+      // let req_data: BTreeMap<Request> = req.json_as().unwrap();
+      // let post_data = conn.query("INSERT INTO herd (breed, name, purchase_date) VALUES ($1, $2, $3)", &[&req_data.body.breed, &req_data.body.name, &req_data.body.purchase_date]).unwrap().into_iter().collect();
+
+      // println!("{:?}", &post_data);
+      // return "hunterlj"
+
+      // let mut post_data: BTreeMap<String, Json> = req.json_as().unwrap();
+      // println!("{:?}", post_data)
+
+      let data = try_with!(res, parse_todo(req));
+      println!("{:?}", &data);
+      return res.send(&data)
       }
     });
 
